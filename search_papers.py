@@ -10,7 +10,7 @@ REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
 def search_papers():
     # 设定搜寻过去 7 天的论文
-    last_week = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+    last_week = (datetime.now() - timedelta(days=150)).strftime('%Y-%m-%d')
     
     # 1. 定义你指定的期刊 ID（这里包含了 Nature, JGR, GRL, SRL 等）
     # 如果你需要添加更多，可以参考下方的“如何获取 ID”部分
@@ -27,7 +27,7 @@ def search_papers():
     # 将 ID 列表转换成 OpenAlex 要求的过滤字符串 (用 | 分隔表示 "或")
     journal_filter = "|".join(journal_ids)
     
-    keywords = ["earthquake initiation", "rupture mechanism", "rock experiment", "laboratory earthquakes"]
+    keywords = ["earthquake", "earthquake initiation", "rupture mechanism", "rock experiment", "laboratory earthquakes"]
     all_results = []
     
     for kw in keywords:
