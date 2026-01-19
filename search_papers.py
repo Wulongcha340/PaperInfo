@@ -9,58 +9,56 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") # 从 GitHub Actions 获取
 REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
 def search_papers():
-    # 设定搜寻过去 7 天的论文
-    last_week = (datetime.now() - timedelta(days=150)).strftime('%Y-%m-%d')
+    # 1. 稍微拉长时间窗口到 10 天，防止某些期刊延迟收录
+    lookback_days = 10
+    start_date = (datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
     
-    # 1. 定义你指定的期刊 ID（这里包含了 Nature, JGR, GRL, SRL 等）
-    # 如果你需要添加更多，可以参考下方的“如何获取 ID”部分
-    journal_ids = [
-        "S137773608", # Nature
-        "S190130009", # Science
-        "S160132380", # Nature Geoscience
-        "S148149864", # Journal of Geophysical Research: Solid Earth
-        "S45189098",  # Geophysical Research Letters
-        "S65330870",  # Seismological Research Letters
-        "S137119741", # Earth and Planetary Science Letters
+    # 2. 地震学 Concept ID
+    SEISMOLOGY_CONCEPT_ID = "C127313418"
+    
+    # 3. 核心关键词
+    keywords = [
+        "earthquake initiation", 
+        "rupture mechanism", 
+        "rock experiment", 
+        "laboratory earthquake",
+        "fault mechanics"
     ]
     
-    # 将 ID 列表转换成 OpenAlex 要求的过滤字符串 (用 | 分隔表示 "或")
-    journal_filter = "|".join(journal_ids)
-    
-    keywords = ["earthquake", "earthquake initiation", "rupture mechanism", "rock experiment", "laboratory earthquakes"]
     all_results = []
     
     for kw in keywords:
-        # 2. 在 filter 中加入 primary_location.source.id
+        # 使用学科过滤 + 关键词搜索
         query = (
             Works()
             .filter(
-                from_publication_date=last_week,
-                primary_location={"source": {"id": journal_filter}} # 锁定期刊
+                from_publication_date=start_date,
+                concepts={"id": SEISMOLOGY_CONCEPT_ID}
             )
             .search(kw)
         )
         results = query.get()
         all_results.extend(results)
     
-    # 根据 DOI 去重
+    # 去重
     unique_results = {work['doi']: work for work in all_results if work.get('doi')}.values()
     
     if not unique_results:
-        return f"本周在指定期刊中暂无相关论文更新。"
+        return f"过去 {lookback_days} 天内未发现相关论文。"
 
-    report = f"## 📅 地震学精选周报 ({last_week} 至今)\n\n"
-    report += "> 检索范围：Nature, Science, JGR, GRL, SRL, EPSL 等顶级期刊\n\n"
-    
-    for work in unique_results:
+    # 按引用次数或相关度排序（可选）
+    sorted_results = sorted(unique_results, key=lambda x: x.get('cited_by_count', 0), reverse=True)
+
+    report = f"## 📅 地震学动态周报 ({start_date} 至今)\n\n"
+    for work in sorted_results:
         title = work.get('display_name', 'No Title')
         doi = work.get('doi', 'No DOI')
         url = work.get('landing_page_url', '#')
         
         primary_loc = work.get('primary_location') or {}
         source = primary_loc.get('source') or {}
-        journal = source.get('display_name', '未知期刊')
-
+        journal = source.get('display_name', '未知期刊/预印本')
+        
         report += f"### {title}\n- **期刊**: {journal}\n- **DOI**: {doi}\n- **链接**: [点击阅读]({url})\n\n---\n"
     
     return report
