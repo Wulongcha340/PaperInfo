@@ -10,7 +10,7 @@ REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
 def search_papers():
     # 设定 50 天 (当前日期: 2026-01-19)
-    start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
     
     # 核心期刊 ID 列表
     journal_ids = [
@@ -79,7 +79,7 @@ def search_papers():
         return "在指定期刊中未匹配到符合‘地震机理/岩石实验’特征的高相关性论文。"
 
     # 构造报告
-    report = f"## 📅 地震学精选周报 ({last_week} 至今)\n\n"
+    report = f"## 📅 地震学精选周报 ({start_date} 至今)\n\n"
     report += "> 检索范围：Nature, Science, JGR, GRL, SRL, EPSL 等顶级期刊\n\n"
     
     for work in unique_results:
