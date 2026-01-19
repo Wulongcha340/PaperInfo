@@ -10,7 +10,7 @@ REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
 def search_papers():
     # 设定搜寻过去 7 天的论文
-    last_week = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+    last_week = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
     
     # 1. 定义你指定的期刊 ID（这里包含了 Nature, JGR, GRL, SRL 等）
     # 如果你需要添加更多，可以参考下方的“如何获取 ID”部分
