@@ -12,6 +12,7 @@ def search_papers():
     # 设定 50 天 (当前日期: 2026-01-19)
     start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
     
+    # 核心期刊 ID 列表
     journal_ids = [
         "S137773608", "S190130009", "S160132380", "S200557434", 
         "S196041119", "S148149864", "S45189098", "S183021966", 
@@ -19,54 +20,57 @@ def search_papers():
     ]
     journal_filter = "|".join(journal_ids)
     
-    # 1. 锚点词：只要包含这些核心词之一，就先抓回来
-    anchor_keywords = ["earthquake", "seismic", "rupture", "fault", "rock"]
-    
-    # 2. 筛选词：在抓回来的结果中，标题或摘要包含以下词汇才保留
-    target_concepts = ["initiation", "mechanism", "experiment", "nucleation", "laboratory", "fracture", "propagation"]
+    # 模糊搜索词：涵盖地震、断层、岩石力学、破裂
+    # 改用 title.search，这在 OpenAlex 中比全局 search 更稳定
+    keywords = ["earthquake", "seismic", "rupture", "fault", "rock", "fracture"]
     
     all_results = []
     
-    for kw in anchor_keywords:
-        print(f"正在抓取包含 '{kw}' 的论文...")
-        # 使用最简单的 search 逻辑
-        query = (
-            Works()
-            .filter(
-                from_publication_date=start_date,
-                primary_location={"source": {"id": journal_filter}}
+    for kw in keywords:
+        print(f"正在检索关键词: {kw}...")
+        # 注意：这里改用了最稳健的字符串键名过滤
+        try:
+            query = (
+                Works()
+                .filter(
+                    from_publication_date=start_date,
+                    # 使用更广泛的 locations.source.id 而不是 primary_location
+                    # 这样只要论文在这些期刊发表，无论是否是“首要链接”都能搜到
+                    **{"locations.source.id": journal_filter} 
+                )
+                # 使用标题搜索，这通常是 API 最核心的支持项
+                .filter(title={"search": kw})
             )
-            .search(kw)
-        )
-        results = query.get()
-        print(f"  - 找到 {len(results)} 篇初步候选文章")
-        all_results.extend(results)
+            results = query.get()
+            print(f"  - 发现 {len(results)} 篇")
+            all_results.extend(results)
+        except Exception as e:
+            print(f"  - 检索 {kw} 时出错: {e}")
     
     # 根据 DOI 去重
     unique_works = {work['doi']: work for work in all_results if work.get('doi')}
+    results_list = list(unique_works.values())
     
-    filtered_report_list = []
+    print(f"初筛完成，共获得 {len(results_list)} 篇论文。正在进行专业度清洗...")
+
+    # 二次手动筛选：确保论文确实是关于地震机制、破裂或实验的
+    final_list = []
+    expert_terms = ["initiation", "mechanism", "experiment", "nucleation", "laboratory", "dynamic", "friction", "constitutive"]
     
-    # 3. Python 二次筛选（模糊匹配）
-    for doi, work in unique_works.items():
-        title = (work.get('display_name') or "").lower()
-        # 尝试获取摘要（OpenAlex 摘要通常是倒排索引，这里做简单处理）
-        abstract = str(work.get('abstract_inverted_index') or "").lower()
-        
-        # 只要标题或摘要里包含任何一个“目标概念词”，就采纳
-        if any(concept in title or concept in abstract for concept in target_concepts):
-            filtered_report_list.append(work)
+    for work in results_list:
+        content = (work.get('display_name') or "").lower()
+        # 如果标题包含任意一个专家词汇，则保留
+        if any(term in content for term in expert_terms):
+            final_list.append(work)
 
-    print(f"筛选完成，最终保留 {len(filtered_report_list)} 篇高度相关的论文。")
+    if not final_list:
+        return "在指定期刊中未匹配到符合‘地震机理/岩石实验’特征的高相关性论文。"
 
-    if not filtered_report_list:
-        return "在候选文章中未发现匹配‘地震起始、破裂机理或岩石实验’特征的论文。"
-
-    # 生成报告内容
-    report = f"## 📅 地震学模糊搜索周报 (过去 50 天)\n\n"
-    for work in filtered_report_list:
-        title = work.get('display_name', 'No Title')
-        journal = work.get('primary_location', {}).get('source', {}).get('display_name', '未知期刊')
+    # 构造报告
+    report = f"## 📅 地震学核心期刊精选 (过去 50 天)\n\n"
+    for work in final_list:
+        title = work.get('display_name')
+        journal = work.get('primary_location', {}).get('source', {}).get('display_name', 'Top Journal')
         url = work.get('landing_page_url', '#')
         report += f"### {title}\n- **期刊**: {journal}\n- **链接**: [点击阅读]({url})\n\n---\n"
     
