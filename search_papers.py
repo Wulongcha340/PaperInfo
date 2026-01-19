@@ -2,7 +2,7 @@ from pyalex import Works, config
 from datetime import datetime, timedelta
 
 # 1. 配置 - 加入邮箱可以进入 OpenAlex 的 "Polite Pool"，请求速度更快且更稳定
-config.email = "your_email@example.com"  # 请替换为你的邮箱
+config.email = "wulongcha340@outlook.com"  # 请替换为你的邮箱
 
 def search_earthquake_papers():
     # 2. 设定时间范围：过去 7 天
