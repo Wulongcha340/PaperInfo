@@ -10,7 +10,7 @@ REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
 def search_papers():
     # 设定搜寻过去 10 天的论文，防止某些期刊更新稍慢
-    start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
     
     # 扩充后的核心期刊 ID 列表
     journal_ids = [
