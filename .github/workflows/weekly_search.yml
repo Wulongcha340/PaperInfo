@@ -2,13 +2,16 @@ name: Weekly Academic Paper Search
 
 on:
   schedule:
-    # 这里的 cron 表达式表示每周一凌晨 0:00 (UTC) 运行
     - cron: '0 0 * * 1'
-  workflow_dispatch: # 允许你手动点击按钮触发运行
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 增加权限设置
+    permissions:
+      issues: write
+      contents: read
 
     steps:
       - name: Checkout code
@@ -22,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+          pip install requests
 
       - name: Run search script
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 这里的变量名必须与脚本一致
         run: python search_papers.py
