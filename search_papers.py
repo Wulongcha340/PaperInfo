@@ -82,7 +82,7 @@ def search_papers():
     report = f"## 📅 地震学精选周报 ({start_date} 至今)\n\n"
     report += "> 检索范围：Nature, Science, JGR, GRL, SRL, EPSL 等顶级期刊\n\n"
     
-    for work in unique_results:
+    for work in final_list:
         title = work.get('display_name', 'No Title')
         doi = work.get('doi', 'No DOI')
         url = work.get('landing_page_url', '#')
