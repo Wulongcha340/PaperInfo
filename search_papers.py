@@ -9,56 +9,77 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") # 从 GitHub Actions 获取
 REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
 def search_papers():
-    # 1. 稍微拉长时间窗口到 10 天，防止某些期刊延迟收录
-    lookback_days = 10
-    start_date = (datetime.now() - timedelta(days=lookback_days)).strftime('%Y-%m-%d')
+    # 设定搜寻过去 10 天的论文，防止某些期刊更新稍慢
+    start_date = (datetime.now() - timedelta(days=10)).strftime('%Y-%m-%d')
     
-    # 2. 地震学 Concept ID
-    SEISMOLOGY_CONCEPT_ID = "C127313418"
+    # 扩充后的核心期刊 ID 列表
+    journal_ids = [
+        "S137773608", # Nature
+        "S190130009", # Science
+        "S160132380", # Nature Geoscience
+        "S200557434", # Science Advances
+        "S196041119", # Nature Communications
+        "S148149864", # JGR: Solid Earth
+        "S45189098",  # GRL
+        "S183021966", # GJI (Geophysical Journal International)
+        "S137119741", # EPSL (Earth and Planetary Science Letters)
+        "S117621406", # BSSA (Bulletin of the Seismological Society of America)
+        "S65330870",  # SRL (Seismological Research Letters)
+        "S121960251", # Tectonophysics
+        "S46648057",  # Rock Mechanics and Rock Engineering
+        "S4210168496" # Communications Earth & Environment
+    ]
     
-    # 3. 核心关键词
+    # 组合期刊过滤器
+    journal_filter = "|".join(journal_ids)
+    
+    # 精准的关键词列表
     keywords = [
         "earthquake initiation", 
         "rupture mechanism", 
         "rock experiment", 
+        "fault mechanics",
         "laboratory earthquake",
-        "fault mechanics"
+        "dynamic rupture",
+        "frictional sliding"
     ]
     
     all_results = []
     
     for kw in keywords:
-        # 使用学科过滤 + 关键词搜索
         query = (
             Works()
             .filter(
                 from_publication_date=start_date,
-                concepts={"id": SEISMOLOGY_CONCEPT_ID}
+                primary_location={"source": {"id": journal_filter}}
             )
             .search(kw)
         )
         results = query.get()
         all_results.extend(results)
     
-    # 去重
+    # 根据 DOI 去重
     unique_results = {work['doi']: work for work in all_results if work.get('doi')}.values()
     
     if not unique_results:
-        return f"过去 {lookback_days} 天内未发现相关论文。"
+        return f"过去 10 天内在指定核心期刊中未发现相关论文。"
 
-    # 按引用次数或相关度排序（可选）
+    # 按引用次数排序（通常新出的论文引用为0，这里主要起稳定排序作用）
     sorted_results = sorted(unique_results, key=lambda x: x.get('cited_by_count', 0), reverse=True)
 
-    report = f"## 📅 地震学动态周报 ({start_date} 至今)\n\n"
+    report = f"## 📅 地震学核心期刊周报 ({start_date} 至今)\n\n"
+    report += "> 监测期刊范围：Nature, Science, JGR, GRL, GJI, BSSA, SRL, Tectonophysics 等\n\n"
+    
     for work in sorted_results:
         title = work.get('display_name', 'No Title')
         doi = work.get('doi', 'No DOI')
         url = work.get('landing_page_url', '#')
         
+        # 提取期刊名
         primary_loc = work.get('primary_location') or {}
         source = primary_loc.get('source') or {}
-        journal = source.get('display_name', '未知期刊/预印本')
-        
+        journal = source.get('display_name', '未知期刊')
+
         report += f"### {title}\n- **期刊**: {journal}\n- **DOI**: {doi}\n- **链接**: [点击阅读]({url})\n\n---\n"
     
     return report
