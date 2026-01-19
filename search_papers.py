@@ -9,32 +9,34 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") # 从 GitHub Actions 获取
 REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
 def search_papers():
+    # 设定搜寻过去 7 天的论文 (当前日期: 2026-01-19)
     last_week = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
     
-    # 关键词列表
     keywords = ["earthquake initiation", "rupture mechanism", "rock experiment", "laboratory earthquakes"]
-    
     all_results = []
     
-    # 逐个搜索关键词并去重
     for kw in keywords:
         query = Works().filter(from_publication_date=last_week).search(kw)
         results = query.get()
         all_results.extend(results)
     
-    # 根据 DOI 去重
     unique_results = {work['doi']: work for work in all_results if work.get('doi')}.values()
     
     if not unique_results:
         return "本周暂无相关关键词的论文更新。"
 
-    # 格式化成 Issue 内容
     report = f"## 📅 地震学论文周报 ({last_week} 至今)\n\n"
     for work in unique_results:
-        title = work.get('display_name')
-        doi = work.get('doi')
-        url = work.get('landing_page_url')
-        journal = work.get('primary_location', {}).get('source', {}).get('display_name', 'Unknown')
+        title = work.get('display_name', 'No Title')
+        doi = work.get('doi', 'No DOI')
+        url = work.get('landing_page_url', '#')
+        
+        # --- 稳健的数据提取开始 ---
+        primary_loc = work.get('primary_location') or {}
+        source = primary_loc.get('source') or {}
+        journal = source.get('display_name', '未知期刊/预印本')
+        # --- 稳健的数据提取结束 ---
+
         report += f"### {title}\n- **期刊**: {journal}\n- **DOI**: {doi}\n- **链接**: [点击阅读]({url})\n\n---\n"
     
     return report
