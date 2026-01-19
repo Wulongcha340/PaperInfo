@@ -4,7 +4,7 @@ from pyalex import Works, config
 from datetime import datetime, timedelta
 
 # 1. 配置
-config.email = "your_email@example.com" 
+config.email = "wulongcha340@outlook.com" 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") # 从 GitHub Actions 获取
 REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
