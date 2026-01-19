@@ -1,67 +1,65 @@
+import os
+import requests
 from pyalex import Works, config
 from datetime import datetime, timedelta
 
-# 1. 配置 - 加入邮箱可以进入 OpenAlex 的 "Polite Pool"，请求速度更快且更稳定
-config.email = "wulongcha340@outlook.com"  # 请替换为你的邮箱
+# 1. 配置
+config.email = "your_email@example.com" 
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") # 从 GitHub Actions 获取
+REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
-def search_earthquake_papers():
-    # 2. 设定时间范围：过去 7 天
+def search_papers():
     last_week = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
-    print(f"正在搜寻 {last_week} 至今发表的论文...\n")
+    
+    # 关键词列表
+    keywords = ["earthquake initiation", "rupture mechanism", "rock experiment", "laboratory earthquakes"]
+    
+    all_results = []
+    
+    # 逐个搜索关键词并去重
+    for kw in keywords:
+        query = Works().filter(from_publication_date=last_week).search(kw)
+        results = query.get()
+        all_results.extend(results)
+    
+    # 根据 DOI 去重
+    unique_results = {work['doi']: work for work in all_results if work.get('doi')}.values()
+    
+    if not unique_results:
+        return "本周暂无相关关键词的论文更新。"
 
-    # 3. 定义目标期刊的 OpenAlex ID (Source ID)
-    # 你可以根据需要添加更多期刊 ID
-    target_journals = {
-        "Nature": "S137773608",
-        "JGR: Solid Earth": "S148149864",
-        "Seismological Research Letters": "S65330870",
-        "Nature Geoscience": "S160132380",
-        "Earth and Planetary Science Letters": "S137119741"
-    }
+    # 格式化成 Issue 内容
+    report = f"## 📅 地震学论文周报 ({last_week} 至今)\n\n"
+    for work in unique_results:
+        title = work.get('display_name')
+        doi = work.get('doi')
+        url = work.get('landing_page_url')
+        journal = work.get('primary_location', {}).get('source', {}).get('display_name', 'Unknown')
+        report += f"### {title}\n- **期刊**: {journal}\n- **DOI**: {doi}\n- **链接**: [点击阅读]({url})\n\n---\n"
+    
+    return report
 
-    # 4. 构建关键词搜索
-    # 使用 | 表示“或”，空格在 search 中默认通常视为关键词组合
-    keywords = "earthquake initiation | rupture mechanism | rock experiment | laboratory earthquakes"
-
-    # 5. 执行查询
-    # 我们通过 filter 限制日期，通过 search 进行关键词匹配
-    query = (
-        Works()
-        .filter(from_publication_date=last_week)
-        .search(keywords)
-    )
-
-    # 获取结果
-    results = query.get()
-
-    if not results:
-        print("本周暂无符合条件的论文更新。")
+def post_issue(content):
+    if not GITHUB_TOKEN or not REPO_NAME:
+        print("未检测到 GitHub Token，仅在控制台打印结果：")
+        print(content)
         return
 
-    print(f"共发现 {len(results)} 篇相关论文：\n" + "="*50)
-
-    for work in results:
-        # 提取标题
-        title = work.get('display_name', 'No Title')
-        
-        # 提取 DOI 和 链接
-        doi = work.get('doi', 'N/A')
-        url = work.get('landing_page_url', 'N/A')
-        
-        # 提取发表日期
-        pub_date = work.get('publication_date', 'N/A')
-        
-        # 提取期刊名称
-        source = work.get('primary_location', {}).get('source', {})
-        journal_name = source.get('display_name', 'Unknown Journal')
-
-        # 打印输出
-        print(f"标题: {title}")
-        print(f"期刊: {journal_name}")
-        print(f"日期: {pub_date}")
-        print(f"DOI: {doi}")
-        print(f"链接: {url}")
-        print("-" * 30)
+    url = f"https://api.github.com/repos/{REPO_NAME}/issues"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+    data = {
+        "title": f"学术周报：{datetime.now().strftime('%Y-%m-%d')}",
+        "body": content
+    }
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 201:
+        print("已成功发布 GitHub Issue！")
+    else:
+        print(f"发布失败: {response.text}")
 
 if __name__ == "__main__":
-    search_earthquake_papers()
+    report_content = search_papers()
+    post_issue(report_content)
