@@ -9,7 +9,7 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") # 从 GitHub Actions 获取
 REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
 def search_papers():
-    # 设定 50 天
+    # 设定 50 天 (当前日期: 2026-01-19)
     start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
     
     journal_ids = [
@@ -19,22 +19,17 @@ def search_papers():
     ]
     journal_filter = "|".join(journal_ids)
     
-    # 修改关键词：使用更核心的单次组合，增加命中率
-    # 注意：在 search 中，多个词默认是 AND 关系
-    keywords = [
-        "earthquake initiation", 
-        "rupture mechanism", 
-        "rock experiment", 
-        "fault mechanics",
-        "dynamic rupture",
-        "laboratory earthquake"
-    ]
+    # 1. 锚点词：只要包含这些核心词之一，就先抓回来
+    anchor_keywords = ["earthquake", "seismic", "rupture", "fault", "rock"]
+    
+    # 2. 筛选词：在抓回来的结果中，标题或摘要包含以下词汇才保留
+    target_concepts = ["initiation", "mechanism", "experiment", "nucleation", "laboratory", "fracture", "propagation"]
     
     all_results = []
     
-    for kw in keywords:
-        print(f"正在检索关键词: {kw}...")
-        # 使用扁平化过滤器字符串，这是最稳妥的写法
+    for kw in anchor_keywords:
+        print(f"正在抓取包含 '{kw}' 的论文...")
+        # 使用最简单的 search 逻辑
         query = (
             Works()
             .filter(
@@ -44,27 +39,36 @@ def search_papers():
             .search(kw)
         )
         results = query.get()
-        print(f"  - 发现 {len(results)} 篇")
+        print(f"  - 找到 {len(results)} 篇初步候选文章")
         all_results.extend(results)
     
-    unique_results = {work['doi']: work for work in all_results if work.get('doi')}.values()
+    # 根据 DOI 去重
+    unique_works = {work['doi']: work for work in all_results if work.get('doi')}
     
-    if not unique_results:
-        # 如果还是没结果，做一次“保底测试”：不搜关键词，只搜该时段内这些期刊的所有论文
-        print("警告：关键词检索无结果。正在尝试无关键词保底检索...")
-        test_query = Works().filter(
-            from_publication_date=start_date,
-            primary_location={"source": {"id": journal_filter}}
-        ).sample(5).get() # 随机取5篇
-        if test_query:
-            print(f"保底检索成功，说明期刊 ID 无误。前两篇标题为：{test_query[0]['display_name']}")
-        return "未能匹配到包含指定关键词的论文。"
+    filtered_report_list = []
+    
+    # 3. Python 二次筛选（模糊匹配）
+    for doi, work in unique_works.items():
+        title = (work.get('display_name') or "").lower()
+        # 尝试获取摘要（OpenAlex 摘要通常是倒排索引，这里做简单处理）
+        abstract = str(work.get('abstract_inverted_index') or "").lower()
+        
+        # 只要标题或摘要里包含任何一个“目标概念词”，就采纳
+        if any(concept in title or concept in abstract for concept in target_concepts):
+            filtered_report_list.append(work)
 
-    # 后续生成报告的代码保持不变...
-    report = f"## 📅 地震学核心期刊周报 (过去 50 天)\n\n"
-    for work in unique_results:
-        # ... 提取信息的代码 ...
-        report += f"### {work.get('display_name')}\n- **期刊**: {work.get('primary_location', {}).get('source', {}).get('display_name')}\n\n"
+    print(f"筛选完成，最终保留 {len(filtered_report_list)} 篇高度相关的论文。")
+
+    if not filtered_report_list:
+        return "在候选文章中未发现匹配‘地震起始、破裂机理或岩石实验’特征的论文。"
+
+    # 生成报告内容
+    report = f"## 📅 地震学模糊搜索周报 (过去 50 天)\n\n"
+    for work in filtered_report_list:
+        title = work.get('display_name', 'No Title')
+        journal = work.get('primary_location', {}).get('source', {}).get('display_name', '未知期刊')
+        url = work.get('landing_page_url', '#')
+        report += f"### {title}\n- **期刊**: {journal}\n- **链接**: [点击阅读]({url})\n\n---\n"
     
     return report
 
