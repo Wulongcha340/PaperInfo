@@ -19,6 +19,16 @@ def search_papers():
         "S4210228715", # JGR Solid Earth
         "S183957208",  # SRL
         "S36624081",   # GRL
+        "S64187185",   # Nature Comm.
+        "S2737427234", # Science Advances
+        "S119230507",  # EPSL
+        "S59098468",   # BSSA
+        "S48977010",   # Nature Geoscience
+        "S4210240585", # AGU Advances
+        "S14326618",   # G3
+        "S125754415",  # PNAS
+        "S195250905",  # Tectophysics
+        "S108821158",  # GJI
     ]
     journal_filter = "|".join(journal_ids)
     
@@ -69,12 +79,19 @@ def search_papers():
         return "在指定期刊中未匹配到符合‘地震机理/岩石实验’特征的高相关性论文。"
 
     # 构造报告
-    report = f"## 📅 地震学核心期刊精选 (过去 50 天)\n\n"
-    for work in final_list:
-        title = work.get('display_name')
-        journal = work.get('primary_location', {}).get('source', {}).get('display_name', 'Top Journal')
+    report = f"## 📅 地震学精选周报 ({last_week} 至今)\n\n"
+    report += "> 检索范围：Nature, Science, JGR, GRL, SRL, EPSL 等顶级期刊\n\n"
+    
+    for work in unique_results:
+        title = work.get('display_name', 'No Title')
+        doi = work.get('doi', 'No DOI')
         url = work.get('landing_page_url', '#')
-        report += f"### {title}\n- **期刊**: {journal}\n- **链接**: [点击阅读]({url})\n\n---\n"
+        
+        primary_loc = work.get('primary_location') or {}
+        source = primary_loc.get('source') or {}
+        journal = source.get('display_name', '未知期刊')
+
+        report += f"### {title}\n- **期刊**: {journal}\n- **DOI**: {doi}\n- **链接**: [点击阅读]({url})\n\n---\n"
     
     return report
 
