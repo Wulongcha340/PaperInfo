@@ -9,6 +9,32 @@ config.email = "wulongcha340@outlook.com"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
+def download_pdf(url, filename):
+    """
+    下载 PDF 文件到指定的本地路径
+    """
+    try:
+        # 创建 downloads 文件夹（如果不存在）
+        if not os.path.exists('downloads'):
+            os.makedirs('downloads')
+        
+        filepath = os.path.join('downloads', filename)
+        response = requests.get(url, stream=True, timeout=30)
+        
+        if response.status_code == 200:
+            with open(filepath, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            print(f"  - 成功下载: {filename}")
+            return True
+        else:
+            print(f"  - 下载失败，状态码: {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"  - 下载出现异常: {e}")
+        return False
+
+
 def load_config(file_name):
     with open(file_name, 'r', encoding='utf-8') as f:
         return json.load(f)
@@ -52,27 +78,46 @@ def search_papers():
         return f"## 📅 地震学核心期刊周报\n\n自 {start_date} 以来，在指定期刊中未发现匹配关键词的论文。"
 
     # 4. 构造 Markdown 报告
-    report = f"## 📅 地震学核心期刊周报 ({start_date} 至今)\n\n"
-    report += f"> 监测关键词: {', '.join(search_keywords)}\n\n---\n"
-
-    # 按引用次数排序（让更重要的论文排在前面）
-    sorted_works = sorted(unique_works.values(), key=lambda x: x.get('cited_by_count', 0), reverse=True)
+    report = f"## 📅 学术前沿文献周报 ({start_date} 至今)\n\n"
+    report += "### 📥 本周已自动获取的 PDF 列表\n"
+    
+    manual_list = "\n### 🔗 需手动下载的论文 (非开源)\n"
+    
+    downloaded_count = 0
 
     for work in sorted_works:
         title = work.get('display_name')
-        # 获取美化后的期刊名
-        raw_id = work.get('primary_location', {}).get('source', {}).get('id', '').split('/')[-1].upper()
-        journal_name = journals_data.get(raw_id, "Core Journal")
-        
         doi = work.get('doi')
         url = work.get('landing_page_url', '#')
         
-        report += f"### {title}\n"
-        report += f"- **期刊**: {journal_name}\n"
-        report += f"- **DOI**: {doi}\n"
-        report += f"- **链接**: [点击访问原文]({url})\n\n"
+        # 提取期刊名逻辑
+        raw_id = work.get('primary_location', {}).get('source', {}).get('id', '').split('/')[-1].upper()
+        journal_name = journals_data.get(raw_id, "Core Journal")
+
+        # --- 增加开源检查与下载逻辑 ---
+        oa_info = work.get('open_access', {})
+        is_oa = oa_info.get('is_oa', False)
+        pdf_url = oa_info.get('oa_url') # 或者使用 work.get('best_oa_location', {}).get('pdf_url')
+
+        if is_oa and pdf_url:
+            # 清理标题中的特殊字符作为文件名
+            safe_title = "".join([c for c in title if c.isalnum() or c in (' ', '-', '_')]).rstrip()
+            filename = f"{safe_title}.pdf"
+            
+            success = download_pdf(pdf_url, filename)
+            if success:
+                downloaded_count += 1
+                report += f"- ✅ **[已下载]** {title} ({journal_name})\n"
+                continue # 已下载的论文不再放入手动列表
+
+        # 如果不开源或下载失败，放入手动列表
+        manual_list += f"#### {title}\n- **期刊**: {journal_name}\n- **DOI**: {doi}\n- **下载入口**: [点击跳转]({url})\n\n---\n"
+
+    # 合并报告
+    if downloaded_count == 0:
+        report += "- (本周无开源论文自动下载)\n"
     
-    return report
+    return report + manual_list
 
 def post_issue(content):
     if not GITHUB_TOKEN:
