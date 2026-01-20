@@ -5,7 +5,7 @@ from pyalex import Works, config
 from datetime import datetime, timedelta
 
 # 配置 OpenAlex
-config.email = "your_email@example.com"
+config.email = "wulongcha340@outlook.com"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
