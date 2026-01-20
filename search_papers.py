@@ -48,7 +48,7 @@ def search_papers():
     search_keywords = keywords_data['active_keywords']
     
     # 2. 设置时间窗口（建议 50 天做初次测试，稳定后改回 7-14 天）
-    start_date = (datetime.now() - timedelta(days=50)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=14)).strftime('%Y-%m-%d')
     journal_filter = "|".join(journal_ids)
     
     unique_works = {}
