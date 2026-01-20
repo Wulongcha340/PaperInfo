@@ -31,3 +31,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 这里的变量名必须与脚本一致
         run: python search_papers.py
+      
+      - name: Upload Downloaded PDFs
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-papers-pdfs
+          path: downloads/*.pdf
+          if-no-files-found: ignore
