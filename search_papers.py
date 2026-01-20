@@ -84,7 +84,9 @@ def search_papers():
     manual_list = "\n### 🔗 需手动下载的论文 (非开源)\n"
     
     downloaded_count = 0
-
+    
+    sorted_works = sorted(unique_works.values(), key=lambda x: x.get('cited_by_count', 0), reverse=True)
+    
     for work in sorted_works:
         title = work.get('display_name')
         doi = work.get('doi')
