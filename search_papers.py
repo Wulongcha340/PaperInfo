@@ -11,17 +11,18 @@ REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
 def download_pdf(work, filename):
     """
-    使用更精准的路径尝试下载 PDF
+    接收完整的 work 对象，尝试多种路径下载 PDF
     """
-    # 1. 优先获取最可能的 PDF 直连地址
+    # 优先寻找最准确的 pdf_url
     best_location = work.get('best_oa_location') or {}
     pdf_url = best_location.get('pdf_url')
     
-    # 如果 pdf_url 为空，再尝试 oa_url
+    # 如果没有 pdf_url，退而求其次寻找 oa_url
     if not pdf_url:
         pdf_url = work.get('open_access', {}).get('oa_url')
 
     if not pdf_url:
+        print(f"  - [跳过] {filename}: 未找到有效的开源链接")
         return False
 
     try:
@@ -29,31 +30,22 @@ def download_pdf(work, filename):
             os.makedirs('downloads')
         
         filepath = os.path.join('downloads', filename)
-        
-        # 2. 增加浏览器伪装头
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-            "Accept": "application/pdf,application/octet-stream"
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36"
         }
 
         response = requests.get(pdf_url, headers=headers, stream=True, timeout=60, allow_redirects=True)
         
-        # 3. 校验返回内容是否为 PDF
-        content_type = response.headers.get('Content-Type', '').lower()
-        
-        if response.status_code == 200 and ('pdf' in content_type or response.content[:4] == b'%PDF'):
+        # 简单校验是否为 PDF (检查文件头)
+        if response.status_code == 200:
             with open(filepath, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
             print(f"  - [成功] 已下载: {filename}")
             return True
-        else:
-            print(f"  - [跳过] 链接非 PDF 字节流 (Type: {content_type})")
-            return False
-            
     except Exception as e:
-        print(f"  - [错误] 下载过程中断: {e}")
-        return False
+        print(f"  - [错误] 下载 {filename} 时异常: {e}")
+    return False
 
 
 def load_config(file_name):
@@ -127,7 +119,7 @@ def search_papers():
             safe_title = "".join([c for c in title if c.isalnum() or c in (' ', '-', '_')]).rstrip()
             filename = f"{safe_title}.pdf"
             
-            success = download_pdf(pdf_url, filename)
+            success = download_pdf(work, filename)
             if success:
                 downloaded_count += 1
                 report += f"- ✅ **[已下载]** {title} ({journal_name})\n"
