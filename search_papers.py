@@ -9,29 +9,50 @@ config.email = "wulongcha340@outlook.com"
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO_NAME = os.getenv("GITHUB_REPOSITORY")
 
-def download_pdf(url, filename):
+def download_pdf(work, filename):
     """
-    下载 PDF 文件到指定的本地路径
+    使用更精准的路径尝试下载 PDF
     """
+    # 1. 优先获取最可能的 PDF 直连地址
+    best_location = work.get('best_oa_location') or {}
+    pdf_url = best_location.get('pdf_url')
+    
+    # 如果 pdf_url 为空，再尝试 oa_url
+    if not pdf_url:
+        pdf_url = work.get('open_access', {}).get('oa_url')
+
+    if not pdf_url:
+        return False
+
     try:
-        # 创建 downloads 文件夹（如果不存在）
         if not os.path.exists('downloads'):
             os.makedirs('downloads')
         
         filepath = os.path.join('downloads', filename)
-        response = requests.get(url, stream=True, timeout=30)
         
-        if response.status_code == 200:
+        # 2. 增加浏览器伪装头
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+            "Accept": "application/pdf,application/octet-stream"
+        }
+
+        response = requests.get(pdf_url, headers=headers, stream=True, timeout=60, allow_redirects=True)
+        
+        # 3. 校验返回内容是否为 PDF
+        content_type = response.headers.get('Content-Type', '').lower()
+        
+        if response.status_code == 200 and ('pdf' in content_type or response.content[:4] == b'%PDF'):
             with open(filepath, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
-            print(f"  - 成功下载: {filename}")
+            print(f"  - [成功] 已下载: {filename}")
             return True
         else:
-            print(f"  - 下载失败，状态码: {response.status_code}")
+            print(f"  - [跳过] 链接非 PDF 字节流 (Type: {content_type})")
             return False
+            
     except Exception as e:
-        print(f"  - 下载出现异常: {e}")
+        print(f"  - [错误] 下载过程中断: {e}")
         return False
 
 
