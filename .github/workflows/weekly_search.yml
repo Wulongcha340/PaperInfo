@@ -1,3 +1,6 @@
+# 周报检索工作流：每周一 01:00 UTC 自动执行。
+# 收邮件方式：使用 GitHub 自带通知。请到 GitHub 网页：
+#   Settings → Notifications → Actions → 勾选 Email，即可在每次运行完成后收到 GitHub 发出的邮件。
 name: Weekly Academic Paper Search
 
 on:
@@ -41,21 +44,3 @@ jobs:
             downloads/**/*.pdf
             downloads/*/weekly_paper_info.md
           if-no-files-found: ignore
-
-      - name: Send email notification
-        if: always()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp-mail.outlook.com
-          server_port: 587
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "[PaperInfo] 周报检索 ${{ job.status }} - ${{ github.run_id }}"
-          body: |
-            周报检索工作流已执行完成。
-            状态: ${{ job.status }}
-            运行 ID: ${{ github.run_id }}
-            仓库: ${{ github.repository }}
-            查看详情: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          to: hanzhang@apm.ac.cn
-          from: ${{ secrets.MAIL_USERNAME }}
