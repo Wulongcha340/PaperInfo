@@ -2,13 +2,13 @@ name: Weekly Academic Paper Search
 
 on:
   schedule:
-    - cron: '0 0 * * 1'
+    # 每周一 01:00 UTC
+    - cron: '0 1 * * 1'
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    # 增加权限设置
     permissions:
       issues: write
       contents: read
@@ -28,13 +28,34 @@ jobs:
           pip install requests
 
       - name: Run search script
+        id: search
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 这里的变量名必须与脚本一致
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python search_papers.py
-      
-      - name: Upload Downloaded PDFs
+
+      - name: Upload Downloaded PDFs and weekly_paper_info
         uses: actions/upload-artifact@v4
         with:
-          name: weekly-papers-pdfs
-          path: downloads/*.pdf
+          name: weekly-papers-and-info
+          path: |
+            downloads/**/*.pdf
+            downloads/*/weekly_paper_info.md
           if-no-files-found: ignore
+
+      - name: Send email notification
+        if: always()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp-mail.outlook.com
+          server_port: 587
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "[PaperInfo] 周报检索 ${{ job.status }} - ${{ github.run_id }}"
+          body: |
+            周报检索工作流已执行完成。
+            状态: ${{ job.status }}
+            运行 ID: ${{ github.run_id }}
+            仓库: ${{ github.repository }}
+            查看详情: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          to: hanzhang@apm.ac.cn
+          from: ${{ secrets.MAIL_USERNAME }}

@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 本地状态文件
+state.json
+
+# 输出目录（下载的PDF和生成的周报）
+downloads/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 生成的报告文件
+地震学学术周报.html
+地震学学术周报.md
+地震学学术周报*.pdf
+
+# 临时文件
+归档*.zip
+归档*/
+*.zip
+
+# 敏感信息（如果存在）
+cookies.json
+
+# 环境变量文件
+.env
+.env.local

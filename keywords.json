@@ -1,12 +1,18 @@
 {
-  "active_keywords": [
-    "earthquake initiation",
-    "rupture mechanism",
-    "rock experiment",
-    "earthquake nucleation",
-    "fault mechanics",
-    "laboratory earthquake",
-    "dynamic rupture",
-    "shallow earthquake"
+  "broad_keywords": [
+    "earthquake",
+    "fault",
+    "seismic"
+  ],
+  "refine_keywords": [
+    "initiation",
+    "rupture",
+    "nucleation",
+    "mechanism",
+    "dynamic",
+    "friction",
+    "laboratory",
+    "experiment",
+    "shallow"
   ]
 }
