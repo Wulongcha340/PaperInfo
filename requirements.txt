@@ -1,5 +1,8 @@
 pyalex
 requests
 pypdf
+pdfplumber
+PyMuPDF
+ocrmypdf
 # 可选：用于将周报 HTML 转为 PDF（pip install weasyprint 后运行 python md_to_pdf.py）
 # weasyprint

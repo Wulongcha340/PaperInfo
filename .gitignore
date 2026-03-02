@@ -5,9 +5,6 @@ __pycache__/
 *.so
 .Python
 
-# 本地状态文件
-state.json
-
 # 输出目录（下载的PDF和生成的周报）
 downloads/
 
