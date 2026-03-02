@@ -24,7 +24,7 @@
 
 ```bash
 python search_papers_enhanced_v2.py \
-  --days 30 \
+  --days 14 \
   --log-level INFO
 ```
 
@@ -35,7 +35,7 @@ python search_papers_enhanced_v2.py \
   -k earthquake -k fault \
   -r initiation -r rupture \
   -j GRL -j "Nature Geoscience" \
-  --days 30
+  --days 14
 ```
 
 ### 3) 禁用二层 refine（新增）
@@ -44,19 +44,30 @@ python search_papers_enhanced_v2.py \
 python search_papers_enhanced_v2.py \
   -k earthquake -k fault \
   --no-refine \
-  --days 30
+  --days 14
 ```
 
 ### 4) 忽略历史记录完整重跑
 
 ```bash
 python search_papers_enhanced_v2.py \
-  --days 30 \
-  --ignore_history \
+  --days 14 \
+  --ignore-history \
   --log-level INFO
 ```
 
-### 5) 仅检查配置（不请求 API、不写文件）
+### 5) 回填历史 state（截止到指定日期）
+
+```bash
+python search_papers_enhanced_v2.py \
+  --days 60 \
+  --end-date 2026-02-09 \
+  --no-download \
+  --no-refine \
+  --log-level INFO
+```
+
+### 6) 仅检查配置（不请求 API、不写文件）
 
 ```bash
 python search_papers_enhanced_v2.py --dry-run
@@ -72,10 +83,11 @@ python search_papers_enhanced_v2.py --dry-run
 | `--refine-keyword` | `-r` | 二层筛选关键词，可重复 |
 | `--no-refine` | - | 禁用二层筛选，覆盖 `-r` 和 JSON 的 `refine_keywords` |
 | `--journal` | `-j` | 期刊（Source ID 或名称），可重复 |
-| `--days` | - | 搜索最近 N 天 |
+| `--days` | - | 搜索最近 N 天（默认有历史 14 天，无历史 7 天） |
+| `--end-date` | - | 将搜索结束日期固定为 `YYYY-MM-DD` |
 | `--keywords` | - | 指定关键词配置文件路径 |
 | `--journals` | - | 指定期刊配置文件路径 |
-| `--ignore_history` | - | 忽略 `state.json`（不读不写） |
+| `--ignore-history` | - | 忽略 `state.json`（不读不写） |
 | `--output` | `-o` | 输出目录 |
 | `--no-download` | - | 不下载 PDF，仅输出报告 |
 | `--post` | - | 发 GitHub Issue（默认不发） |
@@ -162,7 +174,7 @@ python search_papers_enhanced_v2.py --dry-run
 
 ### 2) 想完全忽略历史去重
 
-使用：`--ignore_history`
+使用：`--ignore-history`
 
 ### 3) 期刊名称无法识别
 

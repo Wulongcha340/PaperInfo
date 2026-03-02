@@ -36,11 +36,14 @@ REPO_NAME = os.getenv("GITHUB_REPOSITORY")  # GitHub 仓库名（可选）
 # 状态文件路径：记录已处理过的论文，避免重复
 STATE_PATH = os.path.join(os.path.dirname(__file__), "state.json")
 
-# 默认搜索时间窗口：30天
-DEFAULT_WINDOW_DAYS = 30
+# 默认搜索时间窗口：14天
+DEFAULT_WINDOW_DAYS = 14
+
+# 报告展示窗口：始终显示最近7天（含结束日）
+REPORT_WINDOW_DAYS = 7
 
 # state.json 中最多保留的论文数量，超出时删除最早的，以提升匹配速度
-MAX_SEEN_KEYS = 100
+MAX_SEEN_KEYS = 500
 
 # OpenAlex 单页条数与分页上限（防止意外全量拉取过大）
 OPENALEX_PER_PAGE = 200
@@ -652,7 +655,7 @@ def _prepare_search_inputs(opts):
     if ignore_history:
         state = {"seen_keys": [], "seen_items": [], "last_run_date": None}
         seen_list = []
-        logger.info("已忽略 state.json（--ignore_history）")
+        logger.info("已忽略 state.json（--ignore-history）")
     else:
         state = _load_state()
         seen_list = _extract_seen_list(state)
@@ -666,8 +669,14 @@ def _prepare_search_inputs(opts):
             window_days = 7
             logger.info("state.json 无历史论文，搜索窗口缩短为 %s 天", window_days)
 
-    start_date = (datetime.now() - timedelta(days=window_days)).strftime("%Y-%m-%d")
-    today = datetime.now().strftime("%Y-%m-%d")
+    if opts.get("end_date"):
+        end_dt = datetime.strptime(str(opts["end_date"]), "%Y-%m-%d")
+    else:
+        end_dt = datetime.now()
+
+    start_date = (end_dt - timedelta(days=window_days)).strftime("%Y-%m-%d")
+    today = end_dt.strftime("%Y-%m-%d")
+    report_start_date = (end_dt - timedelta(days=REPORT_WINDOW_DAYS - 1)).strftime("%Y-%m-%d")
 
     broad_keywords_json = keywords_data.get("broad_keywords") or []
     refine_keywords_json = keywords_data.get("refine_keywords") or []
@@ -738,6 +747,7 @@ def _prepare_search_inputs(opts):
         "ignore_history": ignore_history,
         "window_days": window_days,
         "start_date": start_date,
+        "report_start_date": report_start_date,
         "today": today,
         "broad_keywords": broad_keywords,
         "refine_keywords": refine_keywords,
@@ -752,7 +762,8 @@ def _print_dry_run(ctx):
     logger.info("[dry-run] 将要使用的配置与日期范围：")
     logger.info("  --keywords   %s", ctx["keywords_path"])
     logger.info("  --journals   %s", ctx["journals_path"])
-    logger.info("  --days       %s（start_date=%s, today=%s）", ctx["window_days"], ctx["start_date"], ctx["today"])
+    logger.info("  --days       %s（search_start=%s, end_date=%s）", ctx["window_days"], ctx["start_date"], ctx["today"])
+    logger.info("  report_range = %s 至 %s（固定近%s天）", ctx["report_start_date"], ctx["today"], REPORT_WINDOW_DAYS)
     logger.info("  --output     %s", ctx["week_dir"])
     logger.info("  ignore_history = %s", ctx["ignore_history"])
     logger.info("  broad_keywords  = %s", ctx["broad_keywords"])
@@ -761,11 +772,15 @@ def _print_dry_run(ctx):
     logger.info("[dry-run] 未请求 API，未写入任何文件。")
 
 
-def _fetch_works_for_keyword(keyword, start_date, journal_filter):
+def _fetch_works_for_keyword(keyword, start_date, end_date, journal_filter):
     """按关键词分页拉取 OpenAlex works。"""
     url = "https://api.openalex.org/works"
     params = {
-        "filter": f"from_publication_date:{start_date},locations.source.id:{journal_filter}",
+        "filter": (
+            f"from_publication_date:{start_date},"
+            f"to_publication_date:{end_date},"
+            f"locations.source.id:{journal_filter}"
+        ),
         "search": keyword,
         "per-page": OPENALEX_PER_PAGE,
         "cursor": "*",
@@ -798,14 +813,19 @@ def _fetch_works_for_keyword(keyword, start_date, journal_filter):
     return works
 
 
-def _fetch_unique_works(broad_keywords, start_date, journal_filter):
+def _fetch_unique_works(broad_keywords, start_date, end_date, journal_filter):
     """第一层关键词检索并按 DOI/Work ID 去重。"""
     unique_works = {}
-    logger.info("开始搜索（时间窗口：%s 至 %s）...", start_date, datetime.now().strftime("%Y-%m-%d"))
+    logger.info("开始搜索（时间窗口：%s 至 %s）...", start_date, end_date)
     for kw in broad_keywords:
         logger.info("正在检索宽泛关键词: '%s'...", kw)
         try:
-            query = _fetch_works_for_keyword(kw, start_date=start_date, journal_filter=journal_filter)
+            query = _fetch_works_for_keyword(
+                kw,
+                start_date=start_date,
+                end_date=end_date,
+                journal_filter=journal_filter,
+            )
             logger.info("  - 找到 %s 篇", len(query))
             for work in query:
                 key = work.get("doi") or work.get("id")
@@ -843,11 +863,10 @@ def _exclude_seen(unique_works, seen_set):
     return filtered
 
 
-def _build_empty_report(start_date, today, window_days):
+def _build_empty_report(report_start_date, today):
     """生成无新增结果的报告文本。"""
     return (
-        f"## 📅 本周论文信息 ({start_date} 至 {today})\n\n"
-        f"本次使用滑动窗口 {window_days} 天。\n\n"
+        f"## 📅 本周论文信息 ({report_start_date} 至 {today})\n\n"
         f"在指定期刊中未发现**新增**匹配论文（可能是本期无新增，或都已在历史中出现过）。"
     )
 
@@ -899,10 +918,9 @@ def _first_author_lastname_from_work(work) -> str:
     return "UnknownAuthor"
 
 
-def _download_and_render_report(works, journals_data, week_dir, start_date, today, window_days, broad_keywords, refine_keywords, no_download):
+def _download_and_render_report(works, journals_data, week_dir, report_start_date, today, broad_keywords, refine_keywords, no_download):
     """下载与报告生成阶段。"""
-    report = f"## 📅 本周论文信息 ({start_date} 至 {today})\n\n"
-    report += f"- **滑动窗口**: {window_days} 天\n"
+    report = f"## 📅 本周论文信息 ({report_start_date} 至 {today})\n\n"
     if broad_keywords:
         report += f"- **宽泛关键词**: {', '.join(broad_keywords)}\n"
     if refine_keywords:
@@ -1062,6 +1080,7 @@ def search_papers(options=None):
     unique_works = _fetch_unique_works(
         broad_keywords=ctx["broad_keywords"],
         start_date=ctx["start_date"],
+        end_date=ctx["today"],
         journal_filter=ctx["journal_filter"],
     )
     unique_works = _apply_refine_filter(unique_works, ctx["refine_keywords"])
@@ -1069,7 +1088,7 @@ def search_papers(options=None):
 
     report_path = os.path.join(ctx["week_dir"], "weekly_paper_info.md")
     if not unique_works:
-        content = _build_empty_report(ctx["start_date"], ctx["today"], ctx["window_days"])
+        content = _build_empty_report(ctx["report_start_date"], ctx["today"])
         with open(report_path, "w", encoding="utf-8") as f:
             f.write(content + "\n")
         logger.info("[已生成] %s", report_path)
@@ -1086,9 +1105,8 @@ def search_papers(options=None):
         works=unique_works,
         journals_data=ctx["journals_data"],
         week_dir=ctx["week_dir"],
-        start_date=ctx["start_date"],
+        report_start_date=ctx["report_start_date"],
         today=ctx["today"],
-        window_days=ctx["window_days"],
         broad_keywords=ctx["broad_keywords"],
         refine_keywords=ctx["refine_keywords"],
         no_download=opts.get("no_download", False),
@@ -1151,9 +1169,10 @@ def parse_args():
     
     保留原有参数：
         --days: 搜索时间窗口
+        --end-date: 搜索结束日期（YYYY-MM-DD，默认今天）
         --keywords: 关键词配置文件路径
         --journals: 期刊配置文件路径
-        --ignore_history: 忽略历史记录
+        --ignore-history: 忽略历史记录
         --output: 输出目录
         --no-download: 不下载 PDF
         --post: 发布到 GitHub（默认不发布）
@@ -1230,7 +1249,14 @@ def parse_args():
         type=int,
         default=None,
         metavar="N",
-        help="搜索最近 N 天的论文（默认：有历史用 WINDOW_DAYS 或 30，无历史用 7）",
+        help="搜索最近 N 天的论文（默认：有历史用 WINDOW_DAYS 或 14，无历史用 7）",
+    )
+    p.add_argument(
+        "--end-date",
+        type=str,
+        default=None,
+        metavar="YYYY-MM-DD",
+        help="将搜索结束日期固定为 YYYY-MM-DD（默认：今天）。配合 --days 可回填历史 state.json。",
     )
     p.add_argument(
         "--keywords",
@@ -1299,6 +1325,7 @@ if __name__ == "__main__":
     # 步骤2：构建选项字典，传递给 search_papers 函数
     options = {
         "days": args.days,
+        "end_date": args.end_date,
         "keywords": args.keywords,
         "journals": args.journals,
         "ignore_history": args.ignore_history,
