@@ -1,12 +1,12 @@
-# 周报检索工作流：北京时间每周一 07:21 自动执行（UTC 周日 23:21）。
+# 周报检索工作流：北京时间每周一 08:11 自动执行（UTC 周一 00:11）。
 # 收邮件方式：使用 GitHub 自带通知。请到 GitHub 网页：
 #   Settings → Notifications → Actions → 勾选 Email，即可在每次运行完成后收到 GitHub 发出的邮件。
 name: Weekly Academic Paper Search
 
 on:
   schedule:
-    # UTC 周日 23:21（对应北京时间周一 07:21）
-    - cron: '21 23 * * 0'
+    # UTC 周一 00:11（对应北京时间周一 08:11）
+    - cron: '11 0 * * 1'
   workflow_dispatch:
 
 jobs:
